@@ -1,7 +1,14 @@
 - [Copying and Copy Constructor](#copying-and-copy-constructor)
 - [Arrow Operator -\>](#arrow-operator--)
 - [Dynamic Arrays `std::vector`](#dynamic-arrays-stdvector)
-- [Local static](#local-static)
+- [Local Static](#local-static)
+- [Multiple-Return Values](#multiple-return-values)
+		- [1. Pass Arguments by References](#1-pass-arguments-by-references)
+		- [2. Vector](#2-vector)
+		- [3. Tuples and Pairs](#3-tuples-and-pairs)
+		- [4. Using Structs](#4-using-structs)
+- [Templates](#templates)
+- [Stack and Heap](#stack-and-heap)
 
 
 ## Copying and Copy Constructor
@@ -620,7 +627,7 @@ int main()
 this doesn't print anyting thus no copying occurs 🎉
 
 
-## Local static
+## Local Static
 
 You can declare a variable in the local scope as static. This changes its lifetime, how long it will remain before getting deleted (destructed), and its scope.
 
@@ -740,4 +747,399 @@ This function has been called 3 times
 This function has been called 4 times
 This function has been called 5 times
 ```
+
+## Multiple-Return Values
+
+C++ functions can't return multiple values of different types. There are solutions to achieve such a behavior.
+
+#### 1. Pass Arguments by References
+
+```cpp
+#include <iostream>
+#include <string>
+
+void function(const std::string& src, std::string& src_png, std::string& src_jepg)
+{
+	src_png = src + ".png";
+	src_jepg = src + ".jpeg";
+}
+
+int main()
+{
+	std::string file_name = "image";
+	std::string png_path, jpeg_path;
+	function(file_name, png_path, jpeg_path);
+	std::cout << png_path << std::endl << jpeg_path << std::endl;
+}
+```
+
+#### 2. Vector
+
+This will of course require that the contents of the vector of the same type, or pointer to a common base class.
+
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+
+std::vector<std::string> function(const std::string& src)
+{
+	std::vector<std::string> v;
+	v.reserve(2);
+	std::string src_png = src + ".png";
+	std::string src_jpeg = src + ".jpeg";
+	v.push_back(src_png);
+	v.push_back(src_jpeg);
+	return v;
+}
+
+int main()
+{
+	std::string file_name = "image";
+	std::vector<std::string> v = function(file_name);
+	std::cout << v[0] << std::endl << v[1] << std::endl;
+}
+```
+
+#### 3. Tuples and Pairs
+
+Tuples can be used to store any amount of variables of different types. Pairs can be used to store only 2 variables.
+
+```cpp
+#include <iostream>
+#include <string>
+#include <tuple>
+#include <utility>
+
+std::tuple<std::string, std::string> function(const std::string& src)
+{
+	std::string src_png = src + ".png";
+	std::string src_jpeg = src + ".jpeg";
+	std::tuple<std::string, std::string> t = std::make_tuple(src_png, src_jpeg);
+	return t;
+}
+
+int main()
+{
+	std::string file_name = "image";
+	std::tuple<std::string, std::string> t = function(file_name);
+	std::string png_path = std::get<0>(t);
+	std::string jpeg_path = std::get<1>(t);
+	std::cout << png_path << std::endl << jpeg_path << std::endl;
+}
+```
+
+same for tuples but different functions and accessing.
+
+```cpp
+#include <iostream>
+#include <string>
+#include <tuple>
+#include <utility>
+
+std::pair<std::string, std::string> function(const std::string& src)
+{
+	std::string src_png = src + ".png";
+	std::string src_jpeg = src + ".jpeg";
+	std::pair<std::string, std::string> p = std::make_pair(src_png, src_jpeg);
+	return p;
+}
+
+int main()
+{
+	std::string file_name = "image";
+	std::pair<std::string, std::string> p = function(file_name);
+	const std::string& png_path = p.first;
+	const std::string& jpeg_path = p.second;
+	std::cout << png_path << std::endl << jpeg_path << std::endl;
+}
+```
+
+#### 4. Using Structs
+
+This is the best way, for me, because we can avoid the ambiguity of trying to guess in which order the variables were stored and easily, and minimally, update our code if we want to add more variables. Also, it makes our code cleaner from the name of the struct members. 
+
+```cpp
+#include <iostream>
+#include <string>
+
+struct Paths
+{
+	std::string png_path;
+	std::string jpeg_path;
+};
+
+Paths function(const std::string& src)
+{
+	Paths p;
+	p.png_path = src + ".png";
+	p.jpeg_path = src + ".jpeg";
+	return p;
+}
+
+int main()
+{
+	std::string file_name = "image";
+	Paths p = function(file_name);
+	std::cout << p.png_path << std::endl << p.jpeg_path << std::endl;
+}
+```
+
+## Templates
+
+Templates can be used to create a "blueprint" or "template" for your code in which it can support different types. The complier generates a version of that code for each type you used in your code.
+
+For example, if I want to write a function that simply prints a given value in a new line. I can do this,
+
+```cpp
+#include <iostream>
+#include <string>
+
+void print(int value)
+{
+	std::cout << value << std::endl;
+}
+
+void print(std::string value)
+{
+	std::cout << value << std::endl;
+}
+
+void print(float value)
+{
+	std::cout << value << std::endl;
+}
+
+int main()
+{
+	print(1);
+	print("Hello");
+	print(5.5f); // without the print(float _), it will be called by print(int _) and cast 5.5f to int and remove the decimal
+}
+```
+
+of course, this is difficult to maintain and hard to expand for unsupported types. A solution for this is templates.
+
+```cpp
+#include <iostream>
+#include <string>
+
+template <typename T>
+void print(T value)
+{
+	std::cout << value << std::endl;
+}
+
+int main()
+{
+	print(1); // creates a print(int value)
+	print("Hello"); // creates a print(std::string value)
+	print(5.5f); // creates a print(float value)
+}
+```
+
+the templates are evaluated at compile-time. So the generated code will include `print (int value)`, `print (std::string value)`, and `print (float value)`.
+
+
+`template` is a keyword to define that the following block is a blueprint of which a version will be created in compile-time. `<typename T>` is a template parameter, `typename` tells that `T`, which is the common name, of this template block which will be replaced when a different version of the template is used or called.
+
+***NOTE:*** writing `template <class T>` is exactly the same as `template <typename T>`.
+
+
+When `print(1)` is called, `T` is deduced from the type of the first argument which will be `int`. If the deduction of the template argument isn't trivial like this, it's better to explicit define what `T` is.
+
+```cpp
+#include <iostream>
+#include <string>
+
+template <typename T>
+void print(T value)
+{
+	std::cout << value << std::endl;
+}
+
+int main()
+{
+	print<int>(1); // creates a print(int value)
+	print<std::string>("Hello"); // creates a print(std::string value)
+	print<float>(5.5f); // creates a print(float value)
+}
+```
+
+When explicitly define the typename and contradict this explicit definition,
+
+```cpp
+print<float>("Hello"); // creates a print(float value)
+```
+
+we get this error
+
+```
+no instance of function template "print" matches the argument list
+```
+this is because it's expected when using `print<float>` to
+pass `val` as `float` not `std::string`.
+
+---
+We know that the template function is only to create a blueprint of which version are created in compile time depending on what types you used and called. If you didn't use that template function at all, the template function absolutely doesn't exist at all in your code. A way to prove that by creating an error in the template function and not call that function at all.
+
+```cpp
+#include <iostream>
+
+template <typename T>
+void print(T value)
+{
+	const int x = 3;
+	x = 5; // this should raise an error in runitme
+}
+
+int main()
+{
+}
+```
+
+this doesn't raise an error as if the code that is compiled was simply
+
+```cpp
+#include <iostream>
+
+int main()
+{
+}
+```
+
+while this code
+
+```cpp
+#include <iostream>
+
+template <typename T>
+void print(T value)
+{
+	const int x = 3;
+	x = 5; // this should raise an error in runitme
+}
+
+int main()
+{
+	print(3);
+}
+```
+raises an error
+
+```
+'x': you cannot assign to a variable that is const
+```
+because `print (int value)` actually exists.
+
+***NOTE:*** The above discussion about error in templates is true for some compilers including vsc, the one used for the notes. Other compilers like clang will raise an error anyways.
+
+
+---
+
+We can define template classes as well as template functions. Also, we can define more template parameters other than a template type.
+
+```cpp
+#include <iostream>
+#include <string>
+
+template<typename T, int SIZE>
+class Array
+{
+private:
+	T m_arr[SIZE];
+public:
+	int get_size()
+	{
+		return SIZE;
+	}
+
+	void print()
+	{
+		for (int i = 0; i < SIZE; ++i)
+		{
+			std::cout << T{} << ", ";
+		}
+		std::cout << std::endl;
+	}
+};
+
+int main()
+{
+	Array<int, 3> int_arr;
+	std::cout << int_arr.get_size() << std::endl;
+	int_arr.print();
+	Array<std::string, 5> str_arr;
+	std::cout << str_arr.get_size() << std::endl;
+	str_arr.print();
+}
+```
+
+Here, `typename T` tells that T is a template type that can be used anywhere in the code and can be replaced by the type provided when using this class. And `int SIZE` is an integer that is explicitly passed and any `SIZE` is replaced with that value when using this class.
+
+since the templates are evaluated at compile time, the `SIZE` is defined before statically allocating. Otherwise, it wouldn't be compiled in the first place.
+
+
+the above code will be compiled as something like this,
+
+```cpp
+#include <iostream>
+#include <string>
+
+class Array<int, 3>
+{
+private:
+	int m_arr[3];
+public:
+	int get_size()
+	{
+		return 3;
+	}
+
+	void print()
+	{
+		for (int i = 0; i < 3; ++i)
+		{
+			std::cout << int{} << ", ";
+		}
+		std::cout << std::endl;
+	}
+};
+
+class Array<std::string, 5>
+{
+private:
+	std::string m_arr[5];
+public:
+	int get_size()
+	{
+		return 5;
+	}
+
+	void print()
+	{
+		for (int i = 0; i < 5; ++i)
+		{
+			std::cout << std::string{} << ", ";
+		}
+		std::cout << std::endl;
+	}
+};
+
+int main()
+{
+	Array<int, 3> int_arr;
+	std::cout << int_arr.get_size() << std::endl;
+	int_arr.print();
+	Array<std::string, 5> str_arr;
+	std::cout << str_arr.get_size() << std::endl;
+	str_arr.print();
+}
+```
+
+## Stack and Heap
+
+For the program to start, the executable needs to be loaded to the memory as well as allocating physical RAM. The **stack** and **heap** are 2 areas that we have in our RAM. Stack has a predefined size, usually around 2 MB, and the heap an area that has a initial size but can grow and change as our application goes on. The actual loaction of these areas is always the same in our RAM.
+
+Memory is used to store the data. Stack and heap are 2 areas in our memory in which we are allow to store. We can ask C++ to give us some memory from either stack or heap. But the way C++ allocates the requested memory, i.e. memory allocation, is different.
 
