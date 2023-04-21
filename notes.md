@@ -9,6 +9,7 @@
 		- [4. Using Structs](#4-using-structs)
 - [Templates](#templates)
 - [Stack and Heap](#stack-and-heap)
+- [Macros](#macros)
 
 
 ## Copying and Copy Constructor
@@ -1139,7 +1140,269 @@ int main()
 
 ## Stack and Heap
 
-For the program to start, the executable needs to be loaded to the memory as well as allocating physical RAM. The **stack** and **heap** are 2 areas that we have in our RAM. Stack has a predefined size, usually around 2 MB, and the heap an area that has a initial size but can grow and change as our application goes on. The actual loaction of these areas is always the same in our RAM.
+For the program to start, the exec0utable needs to be loaded to the memory as well as allocating physical RAM. The **stack** and **heap** are 2 areas that we have in our RAM. Stack has a predefined size, usually around 2 MB, and the heap an area that has a initial size but can grow and change as our application goes on. The actual loaction of these areas is always the same in our RAM.
 
 Memory is used to store the data. Stack and heap are 2 areas in our memory in which we are allow to store. We can ask C++ to give us some memory from either stack or heap. But the way C++ allocates the requested memory, i.e. memory allocation, is different.
 
+```cpp
+#include <iostream>
+
+struct Vec3
+{
+	int x, y, z;
+
+	Vec3() : x(10), y(11), z(12) {}
+};
+
+int main()
+{
+	int value = 5; // var is integer alloacted on stack
+	int arr[5] = { 1, 2, 3, 4, 5 }; // arr is array of 5 integers allocated on stack
+	Vec3 v; // v is Vec3 alloacted on stack
+}
+```
+
+when looking at the memory of each of these stack-allocated objects. We get this.
+
+<img src="./assets/stack-heap/stack-allocation-memory.png" height="100">
+
+The objects are allocated near each other. Actually, when allocating on stack, the stack pointer moves *backwards* with an amount of the size of the object to be allocated. `value` gets allocated (third rectangle), then the stack pointer moves 20 bytes (5 integers * 4 bytes) and allocate `arr` (second rectangle), then `v` gets allocated `first rectangle` after the stack pointer moves by `12 bytes` which is the size of `Vector3` struct. You can see that there are bytes filled with `cc` between our objects, these are safeguards because we are on debug mode, these bytes are helpful to avoid accessing wrong location and helps us debugging our bugs.
+
+---
+
+For heap, the allocation is different.
+
+```cpp
+#include <iostream>
+
+struct Vec3
+{
+	int x, y, z;
+
+	Vec3() : x(10), y(11), z(12) {}
+};
+
+int main()
+{
+	int* h_value = new int; // h_value points to an int allocated on heap
+	*h_value = 5;
+	int* h_arr = new int[5]{ 1, 2, 3, 4, 5 }; // h_arr points to an int allocated on heap
+	Vec3* h_v = new Vec3(); // h_v points to an Vec3 allocated on heap
+
+	delete h_value;
+	delete[] h_arr;
+	delete h_v;
+}
+```
+
+If we look at the locations of each object created on the heap. Each will be allocated in separate place not close to each other unlike the stack.
+
+`new` calls `malloc` which in turns according to the OS allocate on heap the size required. When starting the application, we get a certain amount of physical RAM and the program will maintain something called **free list** which keeps track of the blocks of memory that are free to use when you want to allocate something on it. It will check on its free list which block have a size enough for your requirement and return a pointer to that block. If it can't find a block with enough space, it will ask the OS to give it some additional blocks. While this is a heavy task, allocating on stack only requires one CPU instruction.
+
+---
+
+So, you should allocate on stack when needed. You should only allocate on heap if you can't allocate on stack due to its lifetime. Objects allocated on heap don't get destructed at the end of the scopes of their definition, they get destroyed when you explicitly do so by calling `delete`. Or if you want a large amount of data, e.g. 50 MB, that can't be allocated on the small stack.
+
+
+## Macros
+
+Macros are preprocessors that are evaluated in preprocessing before compilation starts. Macros are text-replacers. They follow this syntax,
+
+```
+#define text-to-replace text-to-be-replaced-with
+```
+
+For example,
+
+```cpp
+#include <iostream>
+
+#define WAIT std::cin.get()
+
+int main()
+{
+	WAIT;
+}
+```
+
+this code after preprocessing will be
+
+```cpp
+#include <iostream>
+
+int main()
+{
+	std::cin.get();
+}
+```
+
+which will be compiled.
+
+This is possible for any text
+
+```cpp
+#include <iostream>
+
+#define OPEN_SCOPE {
+#define WAIT std::cin.get()
+#define CLOSE_SCOPE }
+
+int main()
+OPEN_SCOPE
+	WAIT;
+CLOSE_SCOPE
+```
+which will be preprocessed to
+
+```cpp
+#include <iostream>
+
+int main()
+{
+	std::cin.get();
+}
+```
+
+---
+
+Macros can recieve arguments as well
+
+```cpp
+#include <iostream>
+
+#define MULTIPLY(x, y) x * y
+
+int main()
+{
+	std::cout << MULTIPLY(3, 4) << std::endl;
+	std::cout << MULTIPLY(2 + 1, 5 - 1) << std::endl;
+}
+```
+
+this prints out
+
+```
+12
+6
+```
+
+but wait, the first statement is correct but the second one should get the same result because 2 + 1 is 3 and 5 - 1 is 4. So why did we get 6 instead of 12 ?
+
+Becuase macros only replaces text, so the actual code will be
+
+```cpp
+#include <iostream>
+
+#define MULTIPLY(x, y) x * y
+
+int main()
+{
+	std::cout << 3 * 4 << std::endl;
+	std::cout << 2 + 1 * 5 - 1 << std::endl;
+}
+```
+
+So yes 3 * 4 is 12 but due to C++ operators precednce, 1 * 5 is evaulated first to 5 then 2 + 5 - 1 is 6. A solution to get the expected behavior is wrap the arguments in braces.
+
+```cpp
+#include <iostream>
+
+#define MULTIPLY(x, y) (x) * (y)
+
+int main()
+{
+	std::cout << MULTIPLY(3, 4) << std::endl;
+	std::cout << MULTIPLY(2 + 1, 5 - 1) << std::endl;
+}
+```
+
+this results in
+
+```
+12
+12
+```
+
+becuase the code after preprocessing was
+
+```cpp
+#include <iostream>
+
+#define MULTIPLY(x, y) (x) * (y)
+
+int main()
+{
+	std::cout << (3) * (4) << std::endl;
+	std::cout << (2 + 1) * (5 - 1) << std::endl;
+}
+```
+
+So 2 + 1 and 5 - 1 will be evaluated before multiplying.
+
+---
+
+Let's assume we want to build a logger in which it logs in console to us, develpers, in **debug** mode and doesn't log anything in **release** mode. We can do this behavior without changing the code of the logger using macros with the following:
+
+
+First, we have to ***define preprocessor definitions*** for debug and release configurations. I'll do this in Visual Studio but of course this can be done in any IDE or cmake easily. In my project properties -> C/C++ -> Preprocessor. I added **AK_DEBUG** and **AK_RELEASE**. *AK* are just my name's initials to tell you that these are my custom definitions.
+
+<img src="./assets/macros/debug_definition.png">
+
+<img src="./assets/macros/release_defintion.png">
+
+Then in our code we can do this
+
+```cpp
+#include <iostream>
+
+#ifdef AK_DEBUG
+#define LOG(msg) std::cout << msg << std::endl
+#else
+#define LOG(msg)
+#endif
+
+int main()
+{
+	LOG("Message");
+}
+```
+
+`AK_DEBUG` is defined in debug mode. So compiling this in debug mode prints out `Message`. But, it isn't defined in release mode, so compiling this in release mode results in not printing anything since `LOG("Message")` was replaced with nothing as if the code was
+
+```cpp
+// debug mode
+
+#include <iostream>
+
+int main()
+{
+	std::cout << "Message" << std::endl;
+}
+```
+
+
+```cpp
+// release mode
+
+#include <iostream>
+
+int main()
+{
+
+}
+```
+
+In macros we can replace text with a multi-line block. Just make sure that after every single line, add `\` to escape the newline.
+
+```cpp
+#include <iostream>
+
+#define MAIN_FN int main()\
+{\
+	std::cout << "Hello from Macro\n";\
+}
+
+MAIN_FN
+```
+
+And this works fine.
