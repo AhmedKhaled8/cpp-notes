@@ -10,6 +10,7 @@
 - [Templates](#templates)
 - [Stack and Heap](#stack-and-heap)
 - [Macros](#macros)
+- [`auto`](#auto)
 
 
 ## Copying and Copy Constructor
@@ -1406,3 +1407,131 @@ MAIN_FN
 ```
 
 And this works fine.
+
+## `auto`
+
+`auto` is a keyword that tells the compiler to deduce the type automatically without explicitly writing it from the user.
+
+```cpp
+#include <iostream>
+
+int main()
+{
+	auto a = 5;		// a is int 
+	auto b = a;		// b is int
+	auto c = 1L;		// c is long
+	auto d = 5.5f;		// d is float
+	auto e = "hello";	// e is const char*
+}
+```
+
+`auto` can be very useful for long types. For example this code,
+
+```cpp
+std::vector<std::string> strings;
+strings.push_back("apple");
+strings.push_back("orange");
+
+for (std::vector<std::string>::iterator it = strings.begin(); it != strings.end(); ++it)
+{
+	std::cout << *it << std::endl;
+}
+```
+
+can be reduced with `auto` to
+
+```cpp
+std::vector<std::string> strings;
+strings.push_back("apple");
+strings.push_back("orange");
+
+for (auto it = strings.begin(); it != strings.end(); ++it)
+{
+	std::cout << *it << std::endl;
+}
+```
+
+and this code
+
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+#include <map>
+#include <unordered_map>
+
+class Device {};
+
+class DeviceManager
+{
+private:
+	std::unordered_map<std::string, std::vector<Device*>> m_devices;
+public:
+	const std::unordered_map<std::string, std::vector<Device*>>& get_devices() const
+	{
+		return m_devices;
+	}
+};
+
+int main()
+{
+	DeviceManager device_manager;
+	const std::unordered_map<std::string, std::vector<Device*>>& devices = device_manager.get_devices();
+}
+```
+
+can be reduced to
+
+
+```cpp
+#include <iostream>
+#include <string>
+#include <vector>
+#include <map>
+#include <unordered_map>
+
+class Device {};
+
+class DeviceManager
+{
+private:
+	std::unordered_map<std::string, std::vector<Device*>> m_devices;
+public:
+	const std::unordered_map<std::string, std::vector<Device*>>& get_devices() const
+	{
+		return m_devices;
+	}
+};
+
+int main()
+{
+	DeviceManager device_manager;
+	auto devices = device_manager.get_devices();
+}
+```
+
+>right? Nope. But why?!
+
+Here `auto` is considered as `std::unordered_map<std::string, std::vector<Device*>>` not as `const std::unordered_map<std::string, std::vector<Device*>>&`. This will make a copy of `m_devices` not a reference to it. To use the latter type, you need to specify the const and reference qualifiers like this,
+
+```cpp
+const auto& auto devices = device_manager.get_devices();
+```
+
+You can also use `auto` for function return types.
+
+```cpp
+class Device {};
+
+class DeviceManager
+{
+private:
+	std::unordered_map<std::string, std::vector<Device*>> m_devices;
+public:
+	const auto& get_devices() const
+	{
+		return m_devices;
+	}
+};
+
+```
