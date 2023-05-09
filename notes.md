@@ -19,8 +19,6 @@
 struct Vector2
 {
         float x, y;
-         // If we didn't provide a default constructor
-         // it will use the instantiation constructor which set the default values for the members 0, 0
 }
 
 int main()
