@@ -1518,6 +1518,8 @@ Here `auto` is considered as `std::unordered_map<std::string, std::vector<Device
 const auto& auto devices = device_manager.get_devices();
 ```
 
+You can check more on that in this [article](https://www.learncpp.com/cpp-tutorial/type-deduction-with-pointers-references-and-const/).
+
 You can also use `auto` for function return types.
 
 ```cpp
