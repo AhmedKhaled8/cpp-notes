@@ -11,6 +11,8 @@
 - [Stack and Heap](#stack-and-heap)
 - [Macros](#macros)
 - [`auto`](#auto)
+- [Function Pointers and Lambdas](#function-pointers-and-lambdas)
+- [Threads](#threads)
 
 
 ## Copying and Copy Constructor
@@ -1533,3 +1535,378 @@ public:
 };
 
 ```
+
+
+## Function Pointers and Lambdas
+
+A function pointer is a way to assign a function to a variable, and pass functions to other functions as arguments. Functions are stored in the memory in the text segment, thus have an address. And we can assign this address to a variable to use it elsewhere. Let's consider the following example,
+
+```cpp
+#include <iostream>
+
+void print_msg(const std::string &msg)
+{
+	std::cout << msg << std::endl;
+}
+
+int main()
+{
+	auto print_msg_p = print_msg;
+}
+```
+
+Here, `print_msg_p` is a pointer to function. But the specific type can be found when hovering on `print_msg_p` to be `void(*print_msg_p)(const std::string &)`. When translating this it becomes, `print_msg_p` is a pointer to a function that receives a `const` reference `&` to a `std::string` and return `void` (nothing). So, we can replace `auto` with
+
+```cpp
+void(*print_msg_p)(const std::string &) = print_msg;
+// here print_msg_p is the name of the pointer to function, can be named anything else
+```
+
+We can use `print_msg_p` as if it was the function name itself by passing arguments.
+
+```cpp
+#include <iostream>
+
+void print_msg(const std::string &msg)
+{
+	std::cout << msg << std::endl;
+}
+
+int main()
+{
+	void(*print_msg_p)(const std::string &) = print_msg;
+	print_msg_p("Hello World");
+	print_msg_p("Hello From Function Pointer");
+}
+```
+
+will result in
+
+```
+Hello World
+Hello From Function Pointer
+```
+
+To reduce the need to write `void(*p)(const std::string &)` for each function pointer we create, we can do one of the following (or both):
+
+* Use `auto`
+* Use `typedef`
+
+```cpp
+#include <iostream>
+
+void print_msg(const std::string &msg)
+{
+	std::cout << msg << std::endl;
+}
+
+typedef void(*Print_Msg_P)(const std::string &);
+
+int main()
+{
+	Print_Msg_P p = print_msg;
+	p("Hello World");
+	p("Hello From Function Pointer");
+}
+```
+
+The function pointers can be very useful when passing to other functions.
+
+```cpp
+#include <iostream>
+#include <vector>
+
+int multiply_by_2(int val)
+{
+	return val * 2;
+}
+
+void apply_for_each(std::vector<int>& v, int(*func)(int))
+{
+	for (auto& val : v)
+		val = func(val);
+}
+
+void print_vector(const std::vector<int>& v)
+{
+	for (const auto& val : v)
+	{
+		std::cout << val << std::endl;
+	}
+}
+
+int main()
+{
+	auto v = std::vector<int>({ 1, 2, 3, 4, 5 });
+	print_vector(v);
+	apply_for_each(v, multiply_by_2);
+	std::cout << "-------------------------" << std::endl;
+	print_vector(v);
+}
+```
+
+Here, we have `apply_for_each` is a function that receives a vector `v` of integers by reference "modifiable" and `function` that will be applied on each value. Here we expect `function` to be `int(*function)(int)` which is what we have with `multiply_by_2` that is a function that takes an `int` as argument and returns `int`. `apply_for_each` modify each value in `v` with the return of `multiply_by_2`. We print the vector before and after applying `apply_for_each`. The above code results in,
+
+
+```
+1
+2
+3
+4
+5
+-------------------------
+2
+4
+6
+8
+10
+```
+
+When passing functions to other functions this way, we need to define the function separately and then pass it. Then can be useful if the function will be used in other times in your code. However, if you want to apply this specific function only few times, instead of writing the function, you can write a ***lambda expression***.
+
+A ***lambda expression*** is a way to write these anonymous functions, those passed to higher-order functions, to define that function in the time(line) you use it. A very simple syntax for a function that takes `int` and returns `int` is 
+
+```cpp
+[](int x){return x * 2;};
+```
+
+this can be used instead of function pointers in the previous example as following,
+
+```cpp
+#include <iostream>
+#include <vector>
+
+void apply_for_each(std::vector<int>& v, int(*func)(int))
+{
+	for (auto& val : v)
+		val = func(val);
+}
+
+void print_vector(const std::vector<int>& v)
+{
+	for (const auto& val : v)
+	{
+		std::cout << val << std::endl;
+	}
+}
+
+int main()
+{
+	auto v = std::vector<int>({ 1, 2, 3, 4, 5 });
+	print_vector(v);
+	apply_for_each(v, [](int val){return val * 2;});
+	std::cout << "-------------------------" << std::endl;
+	print_vector(v);
+	apply_for_each(v, [](int val){return val * 3;});
+	std::cout << "-------------------------" << std::endl;
+	print_vector(v);
+	apply_for_each(v, [](int val){return val / 6;});
+	std::cout << "-------------------------" << std::endl;
+	print_vector(v);
+}
+```
+
+results in
+
+```
+1
+2
+3
+4
+5
+-------------------------
+2
+4
+6
+8
+10
+-------------------------
+6
+12
+18
+24
+30
+-------------------------
+1
+2
+3
+4
+5
+```
+
+No need to define functions explicitly to multiply by 2, 3 or divide by 6.
+
+The lambda follows the following syntax :
+1. `[ ]` is called the **catpure** which are outside objects captured from your code into your lambda expression to be used inside your function.
+   * `[a, &b]` captures `a` by copy and `b` by reference.
+   * `[=]` captures everything by copy
+   * `[&]` captures everything by reference
+
+***VERY IMPORTANT NOTE:*** A lambda expression with an empty capture clause is convertible to a function pointer. So, for the above example,
+
+This works
+
+```cpp
+apply_for_each(v, [](int val){return val * 2;});
+```
+
+
+while these don't
+
+```cpp
+int x = 0;
+apply_for_each(v, [=](int val){return val * 2;});
+apply_for_each(v, [&](int val){return val * 2;});
+apply_for_each(v, [x](int val){return val * 2;});
+```
+
+Solution ? Convert
+
+```cpp
+void apply_for_each(std::vector<int>& v, int(*func)(int))
+```
+
+to 
+
+```cpp
+#include <functional>
+
+void apply_for_each(std::vector<int>& v, const std::function<int(int)> &func)
+```
+
+this works for both c-style raw function pointers and lambda expression with non-empty capture clauses.
+
+2. `()` are filled with parameters that the function (lambda expression) should expect.
+
+	* `[](int x)` function takes an `int x`.
+	* `[]()` function takes nothing.
+	* `[](int x, float y)` function takes an `int x` and `float y`.
+
+3. `{}` which is filled with the body of the actual function utilizing the paramaters passed and objects captured.
+
+>There is more than that for the lambda expression syntax which can be explained easily [here](https://learn.microsoft.com/en-us/cpp/cpp/lambda-expressions-in-cpp?view=msvc-170).
+
+
+## Threads
+Multithreading is a feature that allows concurrent execution of two or more parts of a program for maximum utilization of the CPU. Each part of such a program is called a thread. So, threads are lightweight processes within a process. So, we want a specific part (a function) to be executed in another thread and some main program to be executed in the main thread.
+
+For example, let's say that a function prints a message continously until an input from the user is received, e.g., enter button pressed. The input function `std::cin.get();` would block the code until receiving the input while we want to print the message continously until the input is received.
+
+We can do this by making the function that prints the message in a separate thread and keep the one that waits for the input in the main thread. This can be done like this,
+
+1. Make the function that prints in a separate thread.
+
+First, we define that function,
+
+```cpp
+static bool s_Finished = false;
+
+void print_msg()
+{
+	while (!s_Finished)
+	{
+		std::cout << "Working...." << std::endl;
+	}
+	std::cout << "Finished..." << std::endl;
+}
+```
+
+this function continously print a message until a condition `!s_Finished` is `false`. This happens when `s_Finished` is assigned to `true`.
+
+2. In our main function, we define that we want to execute `print_msg` in a separate thread. This can be done by instanting `std::thread` by passing `print_msg`
+
+```cpp
+int main()
+{
+	std::thread worker(DoWork);
+}
+```
+
+This instantly begins the thread, thus priniting continously as nothing sets `s_Finished` to `true`. Now, we need to set `s_Finished` to `ture` in the main function after `std::cin.get();` is executed.
+
+```cpp
+int main()
+{
+	std::thread worker(print_msg);
+	std::cin.get(); // block the main thread until input is received
+	s_Finished = true; // the loop of print_msg will stop 
+}
+```
+
+To avoid [full CPU load](https://stackoverflow.com/a/1616409), we can add time sleep between each 2 iterations in the infinite loop. [Check also this link](https://stackoverflow.com/questions/1616392/why-does-an-empty-loop-use-so-much-processor-time)
+
+This can be achieved by doing this
+
+```cpp
+void print_msg()
+{
+	using namespace std::literals::chrono_literals; // to use the s user-define literal operator
+	while (!s_Finished)
+	{
+		std::cout << "Working...." << std::endl;
+		std::this_thread::sleep_for(1s); // for that specific thread wait 1 second
+	}
+	std::cout << "Finished..." << std::endl;
+}
+```
+
+So our final program will be something like this
+
+```cpp
+#include <iostream>
+#include <thread>
+
+static bool s_Finished = false;
+
+void print_msg()
+{
+	using namespace std::literals::chrono_literals;
+	while (!s_Finished)
+	{
+		std::cout << "Working...." << std::endl;
+		std::this_thread::sleep_for(1s);
+	}
+	std::cout << "Finished..." << std::endl;
+}
+
+int main()
+{
+	std::thread worker(print_msg);
+	std::cin.get();
+	s_Finished = true;
+}
+```
+
+when we run the program, it crashes when input is received. This happens because our thread wasn't joined or detached before it was destroyed, because it was created on the stack thus destroyed at the end of the scope. [Check this link](https://leimao.github.io/blog/CPP-Ensure-Join-Detach-Before-Thread-Destruction/).
+
+When the destructor of `std::thread` is called, it checks if the object is still associated with a thread or not. If it does while calling the destructor, it calls `std::terminate()` which kills the runtime of the program. So you should call either `join` or `detach` depending on the behavior you want. [Check this link](https://stackoverflow.com/a/37021767).
+
+So, we should modify the code to be
+
+```cpp
+#include <iostream>
+#include <thread>
+
+static bool s_Finished = false;
+
+void print_msg()
+{
+	using namespace std::literals::chrono_literals;
+	while (!s_Finished)
+	{
+		std::cout << "Working...." << std::endl;
+		std::this_thread::sleep_for(1s);
+	}
+	std::cout << "Finished..." << std::endl;
+}
+
+int main()
+{
+	std::thread worker(print_msg);
+	std::cin.get();
+	s_Finished = true;
+	worker.join();
+}
+```
+
+Here, `worker.join();` waits until the thread of execution finishes completely and the thread object can be destroyed safely.
